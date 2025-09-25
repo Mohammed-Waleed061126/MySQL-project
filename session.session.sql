@@ -1,0 +1,36 @@
+-- CREATE DATABASE project;
+-- USE project;
+-- CREATE TABLE customer(
+--     id int primary key auto_increment,
+--     name varchar(50) not null,
+--     email varchar(50) not null unique,
+--     password varchar(50) not null
+-- );
+
+-- CREATE TABLE PlacedOrders(
+--     id int primary key auto_increment,
+--     customerId int not null,
+--     date datetime not null default current_timestamp,
+--     status varchar(50) not null,
+--     address varchar(50) not null,
+--     foreign key (customerId) references customer(id) on delete cascade
+-- );
+
+-- CREATE TABLE stock(
+--     id int primary key auto_increment,
+--     productName varchar(50) not null,
+--     category varchar(50) not null,
+--     quantity int not null,
+--     price float not null,
+--     imagepath varchar(200)
+-- );
+
+-- CREATE TABLE order_details(
+--     order_id int not null,
+--     product_id int not null,
+--     quantity int not null,
+--     price float not null,
+--     primary key (order_id,product_id),
+--     foreign key (order_id) references PlacedOrders(id) on delete cascade,
+--     foreign key (product_id) references stock(id) on delete cascade
+-- );
