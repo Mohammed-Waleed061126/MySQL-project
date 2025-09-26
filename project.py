@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 import mysql.connector
 from dashboard import AdminDashboard
+from shop import CustomerShop
 
 conn = mysql.connector.connect(
     host="localhost",
@@ -61,19 +62,25 @@ def login_window():
     pass_entry.pack(pady=10)
 
     def do_login():
-        email = email_entry.get()
-        password = pass_entry.get()
-        db.execute("SELECT * FROM customer WHERE email = %s AND password = %s", (email, password))
-        user = db.fetchall()
-        if user:
-            messagebox.showinfo("Success", f"Welcome Back {email}!")
-            win.destroy()
-            if email == "smz@gmail.com" and password == "123456789smz":
+      email = email_entry.get()
+      password = pass_entry.get()
+      db.execute("SELECT * FROM customer WHERE email = %s AND password = %s", (email, password))
+      user = db.fetchone()
+      if user:
+          messagebox.showinfo("Success", f"Welcome Back {email}!")
+          win.destroy()
+          if email == "smz@gmail.com" and password == "123456789smz":
               root.destroy()
               app = AdminDashboard()
               app.mainloop()
-        else:
-            messagebox.showerror("Error", "Wrong Email or Password!")
+          else:
+              customer_id = user[0]
+              root.destroy()
+              app = CustomerShop(customer_id)
+              app.mainloop()
+      else:
+          messagebox.showerror("Error", "Wrong Email or Password!")
+
 
     ctk.CTkButton(win, text="Login", width=200, command=do_login).pack(pady=20)
 

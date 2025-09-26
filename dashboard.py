@@ -94,7 +94,7 @@ class AdminDashboard(tk.Tk):
           ttk.Label(card, text=f"Price: ${price:.2f}", font=('Arial', 9), anchor="w", background='#FFFFFF', foreground='#6C757D').pack(fill='x')
           ttk.Label(card, text=f"Quantity: {quantity}", font=('Arial', 9), anchor="w", background='#FFFFFF', foreground='#6C757D').pack(fill='x')
           ttk.Separator(card, orient='horizontal').pack(fill='x', pady=10)
-          ttk.Button(card, text="Change Quantity", style='TButton').pack(fill='x', pady=3)
+          ttk.Button(card, text="Change Quantity", style='TButton', command=lambda pid=product_id, current_qty=quantity: self.open_change_quantity_window(pid, current_qty)).pack(fill='x', pady=3)
           ttk.Button(card, text="Remove Item", style='TButton', command=lambda item_id=product_id: self.remove_item(item_id)).pack(fill='x', pady=3)
 
       for i in range(4):
@@ -104,9 +104,7 @@ class AdminDashboard(tk.Tk):
     def populate_sidebar(self, parent_frame):
         ttk.Label(parent_frame, text="Actions", font=('Arial', 13, 'bold'), background='#E9ECEF', foreground='#343A40').pack(pady=(20, 10), padx=15)
         ttk.Button(parent_frame, text="Create New Item", command=self.open_create_item_window, style='TButton').pack(pady=5, padx=15, fill='x')
-        ttk.Button(parent_frame, text="Placed Orders", style='TButton').pack(pady=5, padx=15, fill='x')
-        ttk.Button(parent_frame, text="Analytics", style='TButton').pack(pady=5, padx=15, fill='x')
-        ttk.Button(parent_frame, text="Settings", style='TButton').pack(pady=5, padx=15, fill='x')
+        ttk.Button(parent_frame, text="Placed Orders", command=self.open_orders_window, style='TButton').pack(pady=5, padx=15, fill='x')
 
     def refresh_products(self):
       for widget in self.products_frame.winfo_children():
@@ -123,11 +121,101 @@ class AdminDashboard(tk.Tk):
               self.refresh_products()
           except mysql.connector.Error as err:
               messagebox.showerror("Database Error", f"Error removing item: {err}")
-          
+    def open_orders_window(self):
+      win = tk.Toplevel(self)
+      win.title("Placed Orders")
+      win.geometry("800x600")
+      win.grab_set()
+      frame = ttk.Frame(win, padding=10)
+      frame.pack(fill=tk.BOTH, expand=True)
+      try:
+          db.execute("SELECT id, customerId, date, status, address FROM PlacedOrders ORDER BY date DESC")
+          orders = db.fetchall()
+      except mysql.connector.Error as err:
+          messagebox.showerror("Database Error", f"Error fetching orders: {err}")
+          return
+
+      for order in orders:
+          order_id, cust_id, date, status, address = order
+    
+          header = ttk.Label(frame, text=f"Order #{order_id} — {date.strftime('%Y-%m-%d %H:%M')} — Status: {status}", font=('Arial', 12, 'bold'))
+          header.pack(anchor="w", pady=(10, 5))
+
+          ttk.Label(frame, text=f"Customer ID: {cust_id} | Address: {address}").pack(anchor="w")
+
+          try:
+              db.execute("""
+                  SELECT s.productName, d.quantity, d.price
+                  FROM order_details d
+                  JOIN stock s ON d.product_id = s.id
+                  WHERE d.order_id = %s
+              """, (order_id,))
+              items = db.fetchall()
+          except mysql.connector.Error as err:
+              messagebox.showerror("Database Error", f"Error fetching order items: {err}")
+              items = []
+
+          total = 0
+          for name, qty, price in items:
+              subtotal = qty * price
+              total += subtotal
+              ttk.Label(frame, text=f"  {name} x {qty} @ ${price:.2f} = ${subtotal:.2f}").pack(anchor="w")
+
+          ttk.Label(frame, text=f"  Total: ${total:.2f}", font=('Arial', 10, 'italic')).pack(anchor="w")
+
+          status_var = tk.StringVar(value=status)
+          status_options = ["Pending", "Shipped", "Delivered", "Canceled"]
+          status_menu = ttk.OptionMenu(frame, status_var, status, *status_options)
+          status_menu.pack(anchor="w", pady=5)
+
+          def update_status(order_id=order_id, stat_var=status_var):
+              new_stat = stat_var.get()
+              try:
+                  db.execute("UPDATE PlacedOrders SET status = %s WHERE id = %s", (new_stat, order_id))
+                  conn.commit()
+                  messagebox.showinfo("Success", f"Order #{order_id} status updated to {new_stat}")
+                  win.destroy()
+                  self.open_orders_window()
+              except mysql.connector.Error as err:
+                  messagebox.showerror("Database Error", f"Could not update status: {err}")
+
+          ttk.Button(frame, text="Update Status", command=update_status).pack(anchor="w", pady=(0, 10))
+          ttk.Separator(frame, orient='horizontal').pack(fill='x', pady=5)
+
+    def open_change_quantity_window(self, product_id, current_quantity):
+      win = tk.Toplevel(self)
+      win.title("Change Quantity")
+      win.geometry("300x150")
+      win.configure(bg="#F8F9FA")
+      win.resizable(False, False)
+      win.transient(self)
+      win.grab_set()
+
+      ttk.Label(win, text="Enter new quantity:", background="#F8F9FA", font=("Arial", 11)).pack(pady=(20, 10))
+      qty_var = tk.StringVar(value=str(current_quantity))
+      qty_entry = ttk.Entry(win, textvariable=qty_var)
+      qty_entry.pack(pady=5)
+      def update_quantity():
+          try:
+              new_qty = int(qty_var.get())
+              if new_qty < 0:
+                  raise ValueError("Quantity must be non-negative.")
+              db.execute("UPDATE stock SET quantity = %s WHERE id = %s", (new_qty, product_id))
+              conn.commit()
+              messagebox.showinfo("Success", "Quantity updated successfully.")
+              win.destroy()
+              self.refresh_products()
+          except ValueError:
+              messagebox.showerror("Invalid Input", "Please enter a valid integer.")
+          except mysql.connector.Error as err:
+              messagebox.showerror("Database Error", f"Error: {err}")
+      ttk.Button(win, text="Update", command=update_quantity, style='TButton').pack(pady=15)
+
     def open_create_item_window(self):
         CreateItemWindow(self)
 
-# --- Create New Item Window ---
+
+
 class CreateItemWindow(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
