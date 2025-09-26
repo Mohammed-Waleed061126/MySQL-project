@@ -16,13 +16,13 @@ class CustomerShop(tk.Tk):
     def __init__(self, customer_id):
         super().__init__()
         self.customer_id = customer_id
-        self.cart = []  # Format: [{'id':..., 'name':..., 'qty':..., 'price':...}]
+        self.cart = []
         
         self.title("Customer Shop")
         self.geometry("1280x768")
         self.configure(bg="#F8F9FA")
         self.state('zoomed')
-
+        
         self.style = ttk.Style()
         self.style.theme_use('clam')
         self.style.configure('TFrame', background='#F8F9FA')
@@ -70,7 +70,6 @@ class CustomerShop(tk.Tk):
             card = ttk.Frame(self.products_frame, style='Card.TFrame', padding=10)
             card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
 
-            # Image
             if image_path:
                 try:
                     img = Image.open(image_path).resize((120, 90))
@@ -111,7 +110,6 @@ class CustomerShop(tk.Tk):
             messagebox.showerror("Invalid Quantity", str(e))
             return
 
-        # Check if already in cart
         for item in self.cart:
             if item['id'] == pid:
                 item['qty'] += qty
@@ -122,31 +120,54 @@ class CustomerShop(tk.Tk):
         messagebox.showinfo("Added", f"{name} added to cart.")
 
     def open_cart_window(self):
-        if not self.cart:
-            messagebox.showinfo("Cart Empty", "You have no items in your cart.")
-            return
+      if not self.cart:
+          messagebox.showinfo("Cart Empty", "You have no items in your cart.")
+          return
 
-        win = tk.Toplevel(self)
-        win.title("Your Cart")
-        win.geometry("400x400")
-        win.configure(bg="#F8F9FA")
-        win.grab_set()
+      def refresh_cart():
+          for widget in frame.winfo_children():
+              widget.destroy()
+          show_cart_items()
 
-        frame = ttk.Frame(win, padding=10)
-        frame.pack(fill=tk.BOTH, expand=True)
+      def remove_item(index):
+          del self.cart[index]
+          refresh_cart()
+          if not self.cart:
+              cart_window.destroy()
+              messagebox.showinfo("Cart Empty", "You have no items in your cart.")
 
-        total = 0
-        for item in self.cart:
-            name = item['name']
-            qty = item['qty']
-            price = item['price']
-            subtotal = qty * price
-            total += subtotal
-            ttk.Label(frame, text=f"{name} x {qty} = ${subtotal:.2f}").pack(anchor="w", pady=2)
+      def show_cart_items():
+          total = 0
+          for idx, item in enumerate(self.cart):
+              name = item['name']
+              qty = item['qty']
+              price = item['price']
+              subtotal = qty * price
+              total += subtotal
 
-        ttk.Label(frame, text=f"Total: ${total:.2f}", font=('Arial', 12, 'bold')).pack(pady=10)
+              item_frame = ttk.Frame(frame)
+              item_frame.pack(fill=tk.X, pady=2)
 
-        ttk.Button(frame, text="Confirm Order", command=lambda: self.confirm_order(win)).pack(pady=10)
+              ttk.Label(item_frame, text=f"{name} x {qty} = ${subtotal:.2f}", width=40).pack(side=tk.LEFT)
+
+              remove_btn = ttk.Button(item_frame, text="Remove", command=lambda i=idx: remove_item(i))
+              remove_btn.pack(side=tk.RIGHT)
+
+          ttk.Label(frame, text=f"\nTotal: ${total:.2f}", font=('Arial', 12, 'bold')).pack(pady=10)
+          ttk.Button(frame, text="Confirm Order", command=lambda: self.confirm_order(cart_window)).pack(pady=10)
+
+      cart_window = tk.Toplevel(self)
+      cart_window.title("Your Cart")
+      cart_window.geometry("400x400")
+      cart_window.configure(bg="#F8F9FA")
+      cart_window.grab_set()
+
+      frame = ttk.Frame(cart_window, padding=10)
+      frame.pack(fill=tk.BOTH, expand=True)
+
+      show_cart_items()
+
+
     def view_orders(self):
       win = tk.Toplevel(self)
       win.title("My Orders")
@@ -169,7 +190,6 @@ class CustomerShop(tk.Tk):
           ttk.Label(frame, text=f"Order #{order_id} - {date.strftime('%Y-%m-%d %H:%M')} - Status: {status}",
                     font=("Arial", 10, "bold")).pack(anchor="w", pady=(10, 2))
 
-          # Fetch order details
           db.execute("""
               SELECT s.productName, d.quantity, d.price
               FROM order_details d
